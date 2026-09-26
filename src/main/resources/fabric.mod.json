@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "id": "combatassist",
+  "version": "${version}",
+  "name": "CombatAssist",
+  "description": "Client-side combat assist. No packets are constructed and the camera is never written to directly.",
+  "authors": [
+    "peirooden"
+  ],
+  "license": "MIT",
+  "icon": "assets/combatassist/icon.png",
+  "environment": "client",
+  "mixins": [
+    "combatassist.mixins.json"
+  ],
+  "entrypoints": {
+    "client": [
+      "com.combatassist.CombatAssistClient"
+    ],
+    "modmenu": [
+      "com.combatassist.compat.CombatAssistModMenu"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.0",
+    "minecraft": "~1.21.11",
+    "java": ">=21",
+    "fabric-api": "*"
+  },
+  "suggests": {
+    "modmenu": "*"
+  }
+}
