@@ -3,6 +3,9 @@ package com.combatassist.module.rule;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.entity.player.PlayerInventory;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -15,9 +18,12 @@ import java.util.List;
  */
 public final class RuleTable {
 
+    private static final String BREACH_ID = "minecraft:breach";
+
     public enum Condition {
         TARGET_BLOCKING("目标举盾", 0.0D, new double[]{0.0D}),
         FALL("下落高度", 1.5D, new double[]{0.0D, 1.0D, 1.5D, 2.0D, 3.0D, 5.0D}),
+        MACE_BREACH("重锤·破甲", 0.0D, new double[]{0.0D}),
         DISTANCE("目标距离", 3.0D, new double[]{2.0D, 3.0D, 3.5D, 4.0D, 4.5D, 6.0D}),
         TARGET_HEALTH("目标血量", 10.0D, new double[]{2.0D, 4.0D, 6.0D, 10.0D, 14.0D, 20.0D}),
         SELF_HEALTH("自身血量", 10.0D, new double[]{2.0D, 4.0D, 6.0D, 10.0D, 14.0D, 20.0D}),
@@ -34,7 +40,7 @@ public final class RuleTable {
         }
 
         public boolean usesThreshold() {
-            return this != TARGET_BLOCKING && this != ALWAYS;
+            return this != TARGET_BLOCKING && this != MACE_BREACH && this != ALWAYS;
         }
     }
 
@@ -79,6 +85,8 @@ public final class RuleTable {
         RULES.clear();
         RULES.add(new Rule(Condition.TARGET_BLOCKING, 0.0D, Action.AXE, true));
         RULES.add(new Rule(Condition.FALL, 1.5D, Action.MACE, true));
+        // 带「破甲」(minecraft:breach) 的重锤不靠下落加成，地面也值得切。
+        RULES.add(new Rule(Condition.MACE_BREACH, 0.0D, Action.MACE, true));
         RULES.add(new Rule(Condition.ALWAYS, 0.0D, Action.SPEAR, true));
     }
 
@@ -101,11 +109,34 @@ public final class RuleTable {
         return switch (condition) {
             case TARGET_BLOCKING -> target instanceof LivingEntity living && living.isBlocking();
             case FALL -> player.fallDistance >= threshold;
+            case MACE_BREACH -> hasBreachMace(player);
             case DISTANCE -> player.distanceTo(target) >= threshold;
             case TARGET_HEALTH -> target instanceof LivingEntity living && living.getHealth() <= threshold;
             case SELF_HEALTH -> player.getHealth() <= threshold;
             case ALWAYS -> true;
         };
+    }
+
+    /**
+     * 热键栏里<b>那一把</b>重锤带不带「破甲」({@code minecraft:breach})。
+     *
+     * <p>只看第一把：秒切换的就是第一把重锤，条件必须和它一致，否则会出现
+     * 「条件说能切、切过去那把其实没破甲」。
+     */
+    private static boolean hasBreachMace(PlayerEntity player) {
+        PlayerInventory inventory = player.getInventory();
+        for (int i = 0; i < PlayerInventory.getHotbarSize(); i++) {
+            ItemStack stack = inventory.getStack(i);
+            if (stack.isOf(Items.MACE)) {
+                for (var entry : stack.getEnchantments().getEnchantments()) {
+                    if (BREACH_ID.equals(entry.getIdAsString())) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        }
+        return false;
     }
 
     /** 第一条命中的规则的动作；没有命中的返回 null。 */
