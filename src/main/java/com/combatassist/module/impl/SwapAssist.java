@@ -48,12 +48,8 @@ public class SwapAssist implements CombatModule {
     /** 破盾后等盾掉下来的窗口（服务端破盾 → 客户端同步有一段延迟）。 */
     private static final int SHIELD_WATCH_TICKS = 20;
 
-    /** 自动切到重锤之后，这段时间内不做"打完切回"。 */
-    private static final int AUTO_SWITCH_GRACE = 20;
-
     private int shieldWatchTicks;
     private Entity shieldTarget;
-    private int autoSwitchGrace;
 
     /** 上一 tick 手持的槽 —— 用来认出"键位刚把玩家挪到武装槽"（= 他按下了攻击键）。 */
     private int lastSelected = -1;
@@ -163,9 +159,6 @@ public class SwapAssist implements CombatModule {
         } else if (attackHoldTicks > 0) {
             attackHoldTicks--;
         }
-        if (autoSwitchGrace > 0) {
-            autoSwitchGrace--;
-        }
 
         // 那个槽位自己的键被我们顶掉了，按下去收不到任何事件。这里直读键盘状态，
         // 玩家一按就把键位还给他并切过去 —— 否则他永远切不进这个槽位。
@@ -227,6 +220,9 @@ public class SwapAssist implements CombatModule {
      * 盾不会掉，也就不会切。只有「目标举盾→斧头」这一条规则有这个待遇，
      * 其余规则仍然是"武装键位、等玩家按"。
      *
+     * <p>**换过去就不回收**（用户要求）：键位全还给玩家、不留"回切"目标 ——
+     * 之后什么时候切回去由玩家自己决定。
+     *
      * @return true = 这一 tick 已经把重锤切上来了，别再走规则表
      */
     private boolean handleShieldBreak(MinecraftClient client, PlayerInventory inventory,
@@ -251,14 +247,13 @@ public class SwapAssist implements CombatModule {
         if (mace < 0 || mace == selected) {
             return false;
         }
-        int origin = originalSlot >= 0 ? originalSlot : previous;
-        unbindKey(client, reboundSlot);
+        // 换过去就不管了：键位全部还给玩家，也不留"回切"目标 ——
+        // 手上已经是重锤，之后什么时候切回去由玩家自己决定。
+        restoreKeys(client, false);
+        armedAction = null;
         selectSlot(client, mace);
-        bindKey(client, mace);
-        armedAction = RuleTable.Action.MACE;
-        originalSlot = origin;
-        autoSwitchGrace = AUTO_SWITCH_GRACE;
-        CombatAssistClient.debug("[CombatAssist] 秒切 盾破了 → 自动切到重锤（槽{}）", mace + 1);
+        CombatAssistClient.debug("[CombatAssist] 秒切 盾破了 → 自动切到重锤（槽{}），之后不再干预",
+                mace + 1);
         return true;
     }
 
@@ -270,10 +265,6 @@ public class SwapAssist implements CombatModule {
         armedAction = action;
 
         if (selected == slot) {
-            if (autoSwitchGrace > 0) {
-                // 刚破盾自动把他换到重锤上 —— 别再"打完切回"，让这一下用重锤打出去。
-                return;
-            }
             // 玩家已经在目标槽上。
             if (attackHoldTicks > 0 && originalSlot >= 0 && originalSlot != slot) {
                 // 是【秒切】刚把他切过来的（他正按着攻击键）→ 打完切回原槽，键位保持武装。
@@ -319,16 +310,6 @@ public class SwapAssist implements CombatModule {
         // 「键 → 绑定」的静态表分发的，不重建的话新绑定的键收不到任何事件。
         KeyBinding.updateKeysByCode();
         reboundSlot = slot;
-    }
-
-    /** 只还原某个槽的键位（不动玩家、不清其它状态）。 */
-    private void unbindKey(MinecraftClient client, int slot) {
-        if (slot < 0 || savedKeys[slot] == null) {
-            return;
-        }
-        client.options.hotbarKeys[slot].setBoundKey(InputUtil.fromTranslationKey(savedKeys[slot]));
-        savedKeys[slot] = null;
-        KeyBinding.updateKeysByCode();
     }
 
     /**
