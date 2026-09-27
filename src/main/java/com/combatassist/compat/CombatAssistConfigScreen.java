@@ -39,19 +39,9 @@ public class CombatAssistConfigScreen extends Screen {
                 v -> v ? "开" : "关",
                 () -> CombatConfig.swapEnabled, v -> CombatConfig.swapEnabled = v);
 
-        addNum(x, top + row++ * GAP, "秒切目标槽",
-                v -> String.valueOf(v + 1),
-                () -> CombatConfig.swapTargetSlot, v -> CombatConfig.swapTargetSlot = v);
-
-        addBool(x, top + row++ * GAP, "攻击后切回",
-                v -> v ? "开" : "关",
-                () -> CombatConfig.swapRestore, v -> CombatConfig.swapRestore = v);
-
-        addHold(x, top + row++ * GAP, "保持时长");
-
-        addDrawableChild(ButtonWidget.builder(Text.literal("秒切规则表 →"), button -> {
+        addDrawableChild(ButtonWidget.builder(Text.literal("秒切优先级表 →"), button -> {
             if (this.client != null) {
-                this.client.setScreen(new RuleTableScreen(this));
+                this.client.setScreen(new PriorityScreen(this));
             }
         }).dimensions(x, top + row++ * GAP, COL_W, ROW_H).build());
 
@@ -74,29 +64,6 @@ public class CombatAssistConfigScreen extends Screen {
             CombatConfig.save();
             button.setMessage(Text.literal(text(name, label.of(getter.get()))));
         }).dimensions(x, y, COL_W, ROW_H).build());
-    }
-
-    private void addNum(int x, int y, String name, IntLabel label,
-                        IntGetter getter, IntSetter setter) {
-        addDrawableChild(ButtonWidget.builder(Text.literal(text(name, label.of(getter.get()))), button -> {
-            setter.set((getter.get() + 1) % 9);
-            CombatConfig.save();
-            button.setMessage(Text.literal(text(name, label.of(getter.get()))));
-        }).dimensions(x, y, COL_W, ROW_H).build());
-    }
-
-    private void addHold(int x, int y, String name) {
-        addDrawableChild(ButtonWidget.builder(Text.literal(text(name, holdLabel())), button -> {
-            CombatConfig.swapHoldTicks = (int) CombatConfig.nextStep(
-                    CombatConfig.HOLD_TICK_STEPS, CombatConfig.swapHoldTicks);
-            CombatConfig.save();
-            button.setMessage(Text.literal(text(name, holdLabel())));
-        }).dimensions(x, y, COL_W, ROW_H).build());
-    }
-
-    private static String holdLabel() {
-        int ticks = CombatConfig.swapHoldTicks;
-        return ticks == 0 ? "同 tick 切回" : ticks + " tick (" + (ticks * 50) + "ms)";
     }
 
     private static String text(String name, String value) {
@@ -131,20 +98,5 @@ public class CombatAssistConfigScreen extends Screen {
     @FunctionalInterface
     public interface BoolSetter {
         void set(boolean value);
-    }
-
-    @FunctionalInterface
-    public interface IntLabel {
-        String of(int value);
-    }
-
-    @FunctionalInterface
-    public interface IntGetter {
-        int get();
-    }
-
-    @FunctionalInterface
-    public interface IntSetter {
-        void set(int value);
     }
 }
